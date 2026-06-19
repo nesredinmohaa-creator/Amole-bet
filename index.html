@@ -1,0 +1,182 @@
+import telebot
+from telebot import types
+import json
+import sys
+
+API_TOKEN = '8914878049:AAGaoJdFZqhBNa_7RmtTl8G5PmeHpFdAi1A'
+WEB_APP_URL = "https://shamil-amole.tiiny.site"  
+
+try:
+    bot = telebot.TeleBot(API_TOKEN)
+    print("----------------------------------------")
+    print("🚀 AmoleBet Backend Engine Live!")
+    print("----------------------------------------", flush=True)
+except Exception as e:
+    print(f"❌ Error: {e}")
+    sys.exit(1)
+
+ADMIN_CHAT_ID = 7633079156  
+
+# Storage dictionaries
+user_status = {}
+registered_players = {}  # Tracks verified registrations {telegram_id: phone}
+referrals = {}           # Tracks referred users {referred_user_id: referrer_user_id}
+
+def get_user_state(chat_id):
+    if chat_id not in user_status:
+        user_status[chat_id] = {
+            "balance": 100.0,
+            "waiting_proof": False,
+            "pending_amount": 0.0,
+            "phone": None
+        }
+    return user_status[chat_id]
+
+# Command: /start with referral tracking support
+@bot.message_handler(commands=['start'])
+def handle_start(message):
+    chat_id = message.chat.id
+    state = get_user_state(chat_id)
+    
+    # Check if referral link was used (format: /start ref_referrerID)
+    parts = message.text.split()
+    if len(parts) > 1 and parts[1].startswith("ref_"):
+        referrer_id = parts[1].split("_")[1]
+        try:
+            referrer_id = int(referrer_id)
+            if referrer_id != chat_id and chat_id not in referrals:
+                referrals[chat_id] = referrer_id
+                print(f"🔗 Referral Link: User {chat_id} invited by {referrer_id}")
+        except ValueError:
+            pass
+
+    welcome_text = (
+        "🏆 **BAGA NAGAAN DHUFTAN AMOLE-BET!** 🏆\n\n"
+        "🎮 Taphadhaa, herrega kee kaffaltii Telebirr fi simulated wallet dhaan guddisaa.\n"
+        "👥 Invite Friends: Invite friends to earn **+10.00 ETB** bonus!\n\n"
+        "👇 Tap the button below to register/login and access your console:"
+    )
+
+    # Keyboard WebApp Button
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    web_app_info = types.WebAppInfo(url=WEB_APP_URL)
+    btn_play = types.KeyboardButton("🎮 OPEN AMOLE-BET CONSOLE 🎮", web_app=web_app_info)
+    keyboard.add(btn_play)
+    
+    bot.send_message(chat_id, welcome_text, reply_markup=keyboard, parse_mode="Markdown")
+
+# ==================== HANDLE DATA RECEIVED FROM THE WEB APP ====================
+@bot.message_handler(content_types=['web_app_data'])
+def handle_web_app_data(message):
+    chat_id = message.chat.id
+    state = get_user_state(chat_id)
+    
+    try:
+        web_data = json.loads(message.web_app_data.data)
+        action = web_data.get("action")
+
+        # 1. User Registration Sync
+        if action == "register":
+            phone = web_data.get("phone")
+            name = web_data.get("name")
+            registered_players[chat_id] = phone
+            state["phone"] = phone
+            
+            # Check if this user was referred by someone
+            if chat_id in referrals:
+                referrer_id = referrals[chat_id]
+                ref_state = get_user_state(referrer_id)
+                
+                # Pay both +10 ETB bonuses!
+                ref_state["balance"] += 10.0
+                state["balance"] += 10.0
+                
+                bot.send_message(referrer_id, f"🎉 Referral Success! Your friend @{message.from_user.username} registered. You earned **+10.00 ETB**!")
+                bot.send_message(chat_id, "🎁 You received a **+10.00 ETB** welcome referral bonus!")
+
+            bot.send_message(chat_id, f"✅ Account registered successfully for {name} ({phone})!")
+
+        # 2. Deposit Request Sync
+        elif action == "deposit_request":
+            amount = float(web_data.get("amount"))
+            state["pending_amount"] = amount
+            state["waiting_proof"] = True
+            
+            deposit_instructions = (
+                f"📥 **DEPOSIT REQUEST: {amount:.2f} ETB**\n\n"
+                f"Please send your payment of **{amount:.2f} ETB** via Telebirr:\n"
+                "📱 **0935140409** (Shamil)\n\n"
+                "⚠️ **Next Step:** Send your Transaction ID or a photo/screenshot of the payment as proof here in this chat window."
+            )
+            bot.send_message(chat_id, deposit_instructions, parse_mode="Markdown")
+
+        # 3. Withdrawal Request Sync
+        elif action == "withdraw_request":
+            amount = float(web_data.get("amount"))
+            phone = web_data.get("phone")
+            name = web_data.get("account_holder")
+            
+            # Notify Admin immediately
+            bot.send_message(ADMIN_CHAT_ID, 
+                f"📤 **WITHDRAWAL CASH-OUT REQUEST!**\n\n"
+                f"Player: {name} (ID: {chat_id})\n"
+                f"Amount: **{amount:.2f} ETB**\n"
+                f"Telebirr Destination: **{phone}**\n\n"
+                f"Please transfer the funds and message the player once completed.", 
+                parse_mode="Markdown"
+            )
+            bot.send_message(chat_id, f"✅ Cashout request of **{amount:.2f} ETB** submitted to Shamil. You will receive it shortly.")
+
+    except Exception as e:
+        bot.send_message(chat_id, f"❌ System sync error: {e}")
+
+# ==================== HANDLE PAYMENT PROOF UPLOAD ====================
+@bot.message_handler(content_types=['text', 'photo'])
+def receive_payment_proof(message):
+    chat_id = message.chat.id
+    state = get_user_state(chat_id)
+    
+    if state["waiting_proof"]:
+        state["waiting_proof"] = False
+        amount = state["pending_amount"]
+        
+        # Forward proof directly to Permanent Admin (Shamil)
+        bot.send_message(ADMIN_CHAT_ID, f"📩 **NEW DEPOSIT PROOF TO VERIFY**\nUser ID: {chat_id}\nRequested Amount: **{amount:.2f} ETB**", parse_mode="Markdown")
+        if message.content_type == 'text':
+            bot.send_message(ADMIN_CHAT_ID, f"💬 TxID/Details: {message.text}")
+        elif message.content_type == 'photo':
+            bot.send_photo(ADMIN_CHAT_ID, message.photo[-1].file_id, caption=f"Deposit Proof - {amount:.2f} ETB")
+            
+        # Admin Buttons
+        markup = types.InlineKeyboardMarkup()
+        btn_app = types.InlineKeyboardButton("Approve ✅", callback_data=f"approve_{chat_id}_{amount}")
+        btn_dec = types.InlineKeyboardButton("Decline ❌", callback_data=f"decline_{chat_id}")
+        markup.add(btn_app, btn_dec)
+        
+        bot.send_message(ADMIN_CHAT_ID, "Execute approval choice:", reply_markup=markup)
+        bot.send_message(chat_id, "⏳ Your proof has been submitted to Shamil for rapid review. Thank you for waiting!")
+    else:
+        bot.send_message(chat_id, "⚠️ Invalid action. Open the console keyboard to continue.")
+
+# ==================== ADMIN DECISION SYSTEM ====================
+@bot.callback_query_handler(func=lambda call: True)
+def handle_approval_buttons(call):
+    bot.answer_callback_query(call.id)
+    parts = call.data.split("_")
+    action = parts[0]
+    target_user = int(parts[1])
+    
+    t_state = get_user_state(target_user)
+    
+    if action == "approve":
+        amount = float(parts[2])
+        t_state["balance"] += amount
+        bot.edit_message_text(f"✅ Approved +{amount} ETB for User {target_user}", chat_id=call.message.chat.id, message_id=call.message.message_id)
+        bot.send_message(target_user, f"🎉 Good news! Shamil approved your deposit of **{amount:.2f} ETB**.")
+    elif action == "decline":
+        bot.edit_message_text(f"❌ Declined deposit for User {target_user}", chat_id=call.message.chat.id, message_id=call.message.message_id)
+        bot.send_message(target_user, "❌ Your deposit proof was declined by Shamil. Please send a valid receipt.")
+
+# Run Bot Engine
+if __name__ == '__main__':
+    bot.polling(none_stop=True)
