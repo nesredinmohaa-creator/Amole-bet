@@ -1,182 +1,900 @@
-import telebot
-from telebot import types
-import json
-import sys
-
-API_TOKEN = '8914878049:AAGaoJdFZqhBNa_7RmtTl8G5PmeHpFdAi1A'
-WEB_APP_URL = "https://shamil-amole.tiiny.site"  
-
-try:
-    bot = telebot.TeleBot(API_TOKEN)
-    print("----------------------------------------")
-    print("🚀 AmoleBet Backend Engine Live!")
-    print("----------------------------------------", flush=True)
-except Exception as e:
-    print(f"❌ Error: {e}")
-    sys.exit(1)
-
-ADMIN_CHAT_ID = 7633079156  
-
-# Storage dictionaries
-user_status = {}
-registered_players = {}  # Tracks verified registrations {telegram_id: phone}
-referrals = {}           # Tracks referred users {referred_user_id: referrer_user_id}
-
-def get_user_state(chat_id):
-    if chat_id not in user_status:
-        user_status[chat_id] = {
-            "balance": 100.0,
-            "waiting_proof": False,
-            "pending_amount": 0.0,
-            "phone": None
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AmoleBet - Ethiopia's Premium Betting Hub</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            appDarkBg: '#0d110e',      /* Exact black-green background from your screenshot */
+            brandCard: '#181c19',       /* Dark gray-green card backgrounds */
+            inputBorder: '#52462a',    /* Dark gold/bronze border color from screenshot */
+            brandGreen: '#00a859',     /* Replicated vibrant green color */
+            brandGold: '#ffc107',
+          }
         }
-    return user_status[chat_id]
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0d110e;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .amole-input {
+      background-color: #151916;
+      border: 1px solid #52462a;
+      border-radius: 0.75rem;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="text-white min-h-screen flex flex-col justify-between overflow-x-hidden pb-24 select-none">
 
-# Command: /start with referral tracking support
-@bot.message_handler(commands=['start'])
-def handle_start(message):
-    chat_id = message.chat.id
-    state = get_user_state(chat_id)
+  <!-- ================= DEVELOPER SYSTEM SWITCH BOARD (TOP BAR) ================= -->
+  <div class="bg-yellow-500 text-black text-[11px] font-black py-1.5 px-4 flex justify-between items-center z-50 relative">
+    <span>⚙️ ADMIN QUICK SWITCH:</span>
+    <div class="flex gap-2">
+      <button onclick="changeRole('player')" id="role-player-btn" class="bg-black text-white px-2 py-0.5 rounded font-bold uppercase">User View</button>
+      <button onclick="changeRole('admin')" id="role-admin-btn" class="bg-black/20 text-black px-2 py-0.5 rounded font-bold uppercase">Admin Dashboard (<span id="pending-count-badge">0</span>)</button>
+    </div>
+  </div>
+
+  <!-- ================= SCREEN 1: REGISTER / SIGN UP SCREEN (EXACT MATCH) ================= -->
+  <div id="auth-screen" class="flex-1 flex flex-col justify-center p-6 max-w-md w-full mx-auto">
+    <div class="flex flex-col gap-6">
+      
+      <!-- Logo -->
+      <div class="text-center flex justify-center items-center py-2">
+        <h1 class="text-2xl font-black tracking-tighter text-white">amole<span class="text-brandGreen">bet</span></h1>
+      </div>
+
+      <!-- Navigation Tabs (Sign In / Sign Up) -->
+      <div class="grid grid-cols-2 gap-1 bg-[#141a16] p-1 rounded-xl border border-white/5">
+        <button onclick="toggleAuthTab('signin')" id="tab-signin" class="py-2 rounded-lg text-xs font-bold text-gray-400 transition">Sign In</button>
+        <button onclick="toggleAuthTab('signup')" id="tab-signup" class="py-2 rounded-lg text-xs font-bold bg-[#252b27] text-white transition border border-white/5">Sign Up</button>
+      </div>
+
+      <!-- Sign Up Input Fields -->
+      <div id="signup-fields" class="flex flex-col gap-4">
+        <div>
+          <label class="text-xs text-gray-400 font-bold block mb-1.5">Phone</label>
+          <div class="amole-input flex items-center px-4 py-2">
+            <span class="text-xs font-bold text-gray-400 mr-2 border-r border-white/10 pr-2">+251</span>
+            <input type="tel" id="reg-phone" placeholder="Phone" class="bg-transparent text-sm w-full text-white py-1 focus:outline-none font-bold">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-400 font-bold block mb-1.5">Password</label>
+          <div class="amole-input flex items-center px-4 py-2">
+            <input type="password" id="reg-pass" placeholder="Password" class="bg-transparent text-sm w-full text-white py-1 focus:outline-none font-bold">
+            <button onclick="viewPassword('reg-pass')" class="text-gray-400 text-xs px-1"><i class="fa-solid fa-eye-slash"></i></button>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-400 font-bold block mb-1.5">Confirm Password</label>
+          <div class="amole-input flex items-center px-4 py-2">
+            <input type="password" id="reg-confirm" placeholder="Confirm Password" class="bg-transparent text-sm w-full text-white py-1 focus:outline-none font-bold">
+            <button onclick="viewPassword('reg-confirm')" class="text-gray-400 text-xs px-1"><i class="fa-solid fa-eye-slash"></i></button>
+          </div>
+        </div>
+
+        <!-- Green Complete Button with X Icon from your screenshot -->
+        <button onclick="triggerVerificationStep()" class="w-full bg-brandGreen hover:brightness-105 text-white font-extrabold py-3 px-4 rounded-xl transition active:scale-95 text-xs tracking-wider flex justify-between items-center mt-2">
+          <span class="mx-auto pl-4">Complete Registration</span>
+          <span><i class="fa-regular fa-circle-xmark text-base"></i></span>
+        </button>
+      </div>
+
+      <!-- Sign In Fields -->
+      <div id="signin-fields" class="hidden flex flex-col gap-4">
+        <div>
+          <label class="text-xs text-gray-400 font-bold block mb-1.5">Phone</label>
+          <div class="amole-input flex items-center px-4 py-2">
+            <span class="text-xs font-bold text-gray-400 mr-2 border-r border-white/10 pr-2">+251</span>
+            <input type="tel" id="login-phone" placeholder="Phone" class="bg-transparent text-sm w-full text-white py-1 focus:outline-none font-bold">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-400 font-bold block mb-1.5">Password</label>
+          <div class="amole-input flex items-center px-4 py-2">
+            <input type="password" id="login-pass" placeholder="Password" class="bg-transparent text-sm w-full text-white py-1 focus:outline-none font-bold">
+            <button onclick="viewPassword('login-pass')" class="text-gray-400 text-xs px-1"><i class="fa-solid fa-eye-slash"></i></button>
+          </div>
+        </div>
+
+        <button onclick="loginUser()" class="w-full bg-brandGreen text-white font-bold py-3 rounded-xl text-xs active:scale-95 transition">
+          Sign In
+        </button>
+      </div>
+
+      <!-- Verification Step (OTP Screen) -->
+      <div id="otp-fields" class="hidden flex flex-col gap-4">
+        <div class="text-center bg-brandCard p-4 rounded-2xl border border-white/5">
+          <p class="text-xs text-brandGreen font-bold">✓ SMS Sent</p>
+          <p class="text-[10px] text-gray-400 mt-1">Please type your 4-digit code below to unlock your balance dashboard.</p>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 font-bold block mb-1.5">SMS Activation Code</label>
+          <div class="amole-input flex items-center px-4 py-2">
+            <input type="text" id="otp-input" placeholder="Enter Code" class="bg-transparent text-center font-mono font-bold tracking-widest text-sm w-full text-white py-1 focus:outline-none">
+          </div>
+          <span class="text-[9px] text-gray-500 block mt-1.5 text-center">Bypass activation code is: <span class="text-brandGreen font-bold">1234</span></span>
+        </div>
+        <button onclick="verifyUserOTP()" class="w-full bg-brandGreen text-white font-black py-3 rounded-xl text-xs active:scale-95 transition">
+          Verify and Activate Account
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= SCREEN 2 & 3: MAIN SPORTS/CASINO GATEWAY ================= -->
+  <div id="main-portal" class="hidden flex-col">
     
-    # Check if referral link was used (format: /start ref_referrerID)
-    parts = message.text.split()
-    if len(parts) > 1 and parts[1].startswith("ref_"):
-        referrer_id = parts[1].split("_")[1]
-        try:
-            referrer_id = int(referrer_id)
-            if referrer_id != chat_id and chat_id not in referrals:
-                referrals[chat_id] = referrer_id
-                print(f"🔗 Referral Link: User {chat_id} invited by {referrer_id}")
-        except ValueError:
-            pass
+    <!-- Header with 0.44 ETB Balance (Exact Match to Screenshot 2) -->
+    <header class="bg-[#141a16] border-b border-white/5 p-4 sticky top-0 z-30 flex justify-between items-center max-w-lg w-full mx-auto">
+      <div class="flex items-center gap-2">
+        <h1 class="text-lg font-black text-white">amole<span class="text-brandGreen">bet</span></h1>
+        <span class="text-lg animate-bounce cursor-pointer" onclick="openCashier('deposit')">🎁</span>
+      </div>
 
-    welcome_text = (
-        "🏆 **BAGA NAGAAN DHUFTAN AMOLE-BET!** 🏆\n\n"
-        "🎮 Taphadhaa, herrega kee kaffaltii Telebirr fi simulated wallet dhaan guddisaa.\n"
-        "👥 Invite Friends: Invite friends to earn **+10.00 ETB** bonus!\n\n"
-        "👇 Tap the button below to register/login and access your console:"
-    )
+      <div class="flex items-center gap-2.5">
+        <!-- Balance Pill (Green Icon + Value ETB) -->
+        <div onclick="openCashier('deposit')" class="cursor-pointer bg-[#1b261f] border border-[#2d3e33] px-3 py-1.5 rounded-full flex items-center gap-2 shadow">
+          <div class="bg-brandGreen text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[9px] font-bold">
+            <i class="fa-solid fa-coins"></i>
+          </div>
+          <span class="text-xs font-black text-white"><span id="user-balance-lbl">0.44</span> <span class="text-[9px] text-brandGreen">ETB</span></span>
+        </div>
 
-    # Keyboard WebApp Button
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    web_app_info = types.WebAppInfo(url=WEB_APP_URL)
-    btn_play = types.KeyboardButton("🎮 OPEN AMOLE-BET CONSOLE 🎮", web_app=web_app_info)
-    keyboard.add(btn_play)
-    
-    bot.send_message(chat_id, welcome_text, reply_markup=keyboard, parse_mode="Markdown")
+        <div class="w-8 h-8 rounded-full bg-brandCard border border-white/10 flex items-center justify-center text-xs relative" onclick="switchTab('profile')">
+          👤
+          <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+        </div>
+      </div>
+    </header>
 
-# ==================== HANDLE DATA RECEIVED FROM THE WEB APP ====================
-@bot.message_handler(content_types=['web_app_data'])
-def handle_web_app_data(message):
-    chat_id = message.chat.id
-    state = get_user_state(chat_id)
-    
-    try:
-        web_data = json.loads(message.web_app_data.data)
-        action = web_data.get("action")
+    <!-- Navigation Slider Category list -->
+    <div class="bg-[#141a16] border-b border-white/5 py-3 overflow-x-auto no-scrollbar max-w-lg w-full mx-auto">
+      <div class="flex gap-4 px-4 text-[10px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">
+        <button onclick="switchMainTab('home')" class="hover:text-white flex flex-col items-center gap-1">⚽ SPORTS</button>
+        <button class="text-brandGold flex items-center gap-1">🐓 CHICKEN ROAD 2.0 <span class="text-[7px] bg-red-600 text-white px-1 rounded font-black">NEW</span></button>
+        <button onclick="switchMainTab('aviator')" class="hover:text-white flex flex-col items-center gap-1">✈️ AVIATOR</button>
+        <button onclick="switchMainTab('home')" class="hover:text-white flex flex-col items-center gap-1">🎰 CASINO</button>
+        <button onclick="switchMainTab('more')" class="hover:text-white flex flex-col items-center gap-1">⚙️ MORE</button>
+      </div>
+    </div>
 
-        # 1. User Registration Sync
-        if action == "register":
-            phone = web_data.get("phone")
-            name = web_data.get("name")
-            registered_players[chat_id] = phone
-            state["phone"] = phone
-            
-            # Check if this user was referred by someone
-            if chat_id in referrals:
-                referrer_id = referrals[chat_id]
-                ref_state = get_user_state(referrer_id)
-                
-                # Pay both +10 ETB bonuses!
-                ref_state["balance"] += 10.0
-                state["balance"] += 10.0
-                
-                bot.send_message(referrer_id, f"🎉 Referral Success! Your friend @{message.from_user.username} registered. You earned **+10.00 ETB**!")
-                bot.send_message(chat_id, "🎁 You received a **+10.00 ETB** welcome referral bonus!")
+    <!-- Scrollable Arena Body -->
+    <main class="max-w-lg w-full mx-auto px-4 py-4 flex flex-col gap-6">
 
-            bot.send_message(chat_id, f"✅ Account registered successfully for {name} ({phone})!")
-
-        # 2. Deposit Request Sync
-        elif action == "deposit_request":
-            amount = float(web_data.get("amount"))
-            state["pending_amount"] = amount
-            state["waiting_proof"] = True
-            
-            deposit_instructions = (
-                f"📥 **DEPOSIT REQUEST: {amount:.2f} ETB**\n\n"
-                f"Please send your payment of **{amount:.2f} ETB** via Telebirr:\n"
-                "📱 **0935140409** (Shamil)\n\n"
-                "⚠️ **Next Step:** Send your Transaction ID or a photo/screenshot of the payment as proof here in this chat window."
-            )
-            bot.send_message(chat_id, deposit_instructions, parse_mode="Markdown")
-
-        # 3. Withdrawal Request Sync
-        elif action == "withdraw_request":
-            amount = float(web_data.get("amount"))
-            phone = web_data.get("phone")
-            name = web_data.get("account_holder")
-            
-            # Notify Admin immediately
-            bot.send_message(ADMIN_CHAT_ID, 
-                f"📤 **WITHDRAWAL CASH-OUT REQUEST!**\n\n"
-                f"Player: {name} (ID: {chat_id})\n"
-                f"Amount: **{amount:.2f} ETB**\n"
-                f"Telebirr Destination: **{phone}**\n\n"
-                f"Please transfer the funds and message the player once completed.", 
-                parse_mode="Markdown"
-            )
-            bot.send_message(chat_id, f"✅ Cashout request of **{amount:.2f} ETB** submitted to Shamil. You will receive it shortly.")
-
-    except Exception as e:
-        bot.send_message(chat_id, f"❌ System sync error: {e}")
-
-# ==================== HANDLE PAYMENT PROOF UPLOAD ====================
-@bot.message_handler(content_types=['text', 'photo'])
-def receive_payment_proof(message):
-    chat_id = message.chat.id
-    state = get_user_state(chat_id)
-    
-    if state["waiting_proof"]:
-        state["waiting_proof"] = False
-        amount = state["pending_amount"]
+      <!-- View: Home -->
+      <div id="view-home" class="view-content flex flex-col gap-5">
         
-        # Forward proof directly to Permanent Admin (Shamil)
-        bot.send_message(ADMIN_CHAT_ID, f"📩 **NEW DEPOSIT PROOF TO VERIFY**\nUser ID: {chat_id}\nRequested Amount: **{amount:.2f} ETB**", parse_mode="Markdown")
-        if message.content_type == 'text':
-            bot.send_message(ADMIN_CHAT_ID, f"💬 TxID/Details: {message.text}")
-        elif message.content_type == 'photo':
-            bot.send_photo(ADMIN_CHAT_ID, message.photo[-1].file_id, caption=f"Deposit Proof - {amount:.2f} ETB")
-            
-        # Admin Buttons
-        markup = types.InlineKeyboardMarkup()
-        btn_app = types.InlineKeyboardButton("Approve ✅", callback_data=f"approve_{chat_id}_{amount}")
-        btn_dec = types.InlineKeyboardButton("Decline ❌", callback_data=f"decline_{chat_id}")
-        markup.add(btn_app, btn_dec)
+        <!-- Virtual Sports banner layout -->
+        <div>
+          <h2 class="text-base font-black text-white tracking-tight mb-3">Virtual Sports</h2>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-brandCard rounded-2xl p-4 border border-white/5 relative h-36 flex flex-col justify-between cursor-pointer" onclick="alert('Lobby is loading...')">
+              <span class="bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded w-max">GOLDEN RACE</span>
+              <div>
+                <h4 class="font-extrabold text-xs">LOBBY</h4>
+                <p class="text-[9px] text-gray-500">Virtual Sports</p>
+              </div>
+            </div>
+            <div class="bg-brandCard rounded-2xl p-4 border border-white/5 relative h-36 flex flex-col justify-between cursor-pointer" onclick="alert('Penalty Lobby loading...')">
+              <span class="bg-brandGreen text-white text-[8px] font-black px-1.5 py-0.5 rounded w-max">PENALTY</span>
+              <div>
+                <h4 class="font-extrabold text-xs">KICK OUT</h4>
+                <p class="text-[9px] text-gray-500">Penalty Game</p>
+              </div>
+            </div>
+          </div>
+          <button class="w-full bg-brandCard border border-white/5 text-brandGreen font-bold text-xs py-2.5 rounded-xl mt-2">View all</button>
+        </div>
+
+        <!-- Recent Winners Block from Screenshot 2 -->
+        <div>
+          <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Recent Casino Wins</h3>
+          <div class="flex gap-2 overflow-x-auto no-scrollbar">
+            <div class="bg-brandCard p-3 rounded-2xl min-w-[110px] text-center border border-white/5">
+              <p class="text-[10px] font-bold text-brandGold">JETX</p>
+              <p class="text-[8px] text-gray-400 mt-1">+******3</p>
+              <p class="text-[10px] font-black text-brandGreen mt-1">ETB 85.87k</p>
+            </div>
+            <div class="bg-brandCard p-3 rounded-2xl min-w-[110px] text-center border border-white/5">
+              <p class="text-[10px] font-bold text-brandGold">JETX</p>
+              <p class="text-[8px] text-gray-400 mt-1">+******3</p>
+              <p class="text-[10px] font-black text-brandGreen mt-1">ETB 76.2k</p>
+            </div>
+            <div class="bg-brandCard p-3 rounded-2xl min-w-[110px] text-center border border-white/5">
+              <p class="text-[10px] font-bold text-gray-400">KENO</p>
+              <p class="text-[8px] text-gray-400 mt-1">+******4</p>
+              <p class="text-[10px] font-black text-brandGreen mt-1">ETB 75.59k</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sports Betting Matches layout from Screenshot 3 -->
+        <div>
+          <h2 class="text-base font-black mb-3">Sports Matches</h2>
+          <div class="bg-brandCard border border-white/5 p-4 rounded-2xl flex flex-col gap-3">
+            <div class="flex justify-between text-[9px] text-gray-500 uppercase font-bold">
+              <span>English Premier League</span>
+              <span class="text-brandGreen">Live 64'</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <h3 class="font-extrabold text-xs">Arsenal vs Chelsea</h3>
+              <span class="text-xs font-bold text-brandGold">2 - 1</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div onclick="sportsBetStake('Arsenal', 2.28)" class="bg-black/30 p-2.5 rounded-xl text-center cursor-pointer border border-white/5 hover:bg-brandGreen/20">
+                <span class="text-[9px] text-gray-500 block">1</span>
+                <span class="text-xs font-black text-brandGreen">2.28</span>
+              </div>
+              <div onclick="sportsBetStake('Draw', 3.27)" class="bg-black/30 p-2.5 rounded-xl text-center cursor-pointer border border-white/5 hover:bg-brandGreen/20">
+                <span class="text-[9px] text-gray-500 block">X</span>
+                <span class="text-xs font-black text-brandGreen">3.27</span>
+              </div>
+              <div onclick="sportsBetStake('Chelsea', 3.26)" class="bg-black/30 p-2.5 rounded-xl text-center cursor-pointer border border-white/5 hover:bg-brandGreen/20">
+                <span class="text-[9px] text-gray-500 block">2</span>
+                <span class="text-xs font-black text-brandGreen">3.26</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- View: Aviator Game -->
+      <div id="view-aviator" class="view-content hidden flex flex-col gap-4">
+        <div class="bg-brandCard border border-white/5 rounded-3xl p-5 h-72 flex flex-col justify-between relative overflow-hidden">
+          <div class="flex justify-between items-center">
+            <span class="text-[9px] bg-red-600 text-white px-2 py-0.5 rounded font-bold">AVIATOR CRASH</span>
+            <span class="text-xs font-mono text-gray-400">Target: Live</span>
+          </div>
+          <div class="text-center">
+            <h1 id="av-multiplier" class="text-5xl font-black text-brandGold font-mono">1.00x</h1>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="number" id="av-bet" placeholder="Bet Stake (ETB)" class="bg-black/40 text-xs p-3 rounded-xl border border-white/10 font-bold focus:outline-none">
+            <button onclick="runAviator()" id="av-btn" class="bg-brandGreen text-white font-black rounded-xl text-xs transition">Place Bet</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- View: Cashier Portal -->
+      <div id="view-cashier" class="view-content hidden flex flex-col gap-4">
+        <div class="grid grid-cols-2 gap-2 bg-[#141a16] p-1 rounded-xl">
+          <button onclick="toggleCashierMenu('deposit')" id="cashier-btn-dep" class="py-2.5 rounded-lg text-xs font-black bg-brandGreen text-white transition">Deposit</button>
+          <button onclick="toggleCashierMenu('withdraw')" id="cashier-btn-wth" class="py-2.5 rounded-lg text-xs font-black text-gray-400 transition">Withdraw</button>
+        </div>
+
+        <!-- Telebirr Deposit Instructions -->
+        <div id="cashier-deposit-panel" class="flex flex-col gap-4">
+          <div class="bg-brandCard p-5 rounded-3xl border border-white/5 flex flex-col gap-4 text-xs">
+            <h3 class="font-extrabold text-base text-white">Telebirr Direct Deposit Option</h3>
+            <p class="text-gray-400">Make your manual payment directly to Shamil on Telebirr:</p>
+
+            <div class="bg-black/35 p-4 rounded-2xl border border-white/10 text-center font-mono flex flex-col gap-1">
+              <span class="text-[9px] text-gray-500">RECIPIENT MERCHANT:</span>
+              <span class="text-lg text-brandGold font-black tracking-widest">0935140409</span>
+              <span class="text-[10px] text-white font-bold uppercase">(SHAMIL)</span>
+            </div>
+
+            <div class="flex flex-col gap-3">
+              <div>
+                <label class="text-[10px] text-gray-400 font-bold block mb-1">DEPOSIT STAKE (ETB)</label>
+                <input type="number" id="deposit-amount-field" placeholder="Minimum 50 ETB" class="w-full bg-[#1e2420] text-xs text-white p-3 rounded-xl border border-[#2d3630] focus:outline-none focus:border-brandGreen font-bold">
+              </div>
+              <div>
+                <label class="text-[10px] text-gray-400 font-bold block mb-1">TELEBIRR REF CODE ID</label>
+                <input type="text" id="deposit-ref-field" placeholder="Enter Ref code" class="w-full bg-[#1e2420] text-xs text-white p-3 rounded-xl border border-[#2d3630] focus:outline-none focus:border-brandGreen font-mono font-bold uppercase">
+              </div>
+              <button onclick="submitTelebirrDepositSlip()" class="w-full bg-brandGreen hover:bg-brandGreenHover text-white font-black py-3.5 rounded-xl transition">
+                Submit Slip For Admin Approval
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank Withdraw Panel -->
+        <div id="cashier-withdraw-panel" class="hidden flex flex-col gap-4">
+          <div class="bg-brandCard p-5 rounded-3xl border border-white/5 flex flex-col gap-4">
+            <h3 class="font-bold text-sm">Request Bank Withdrawal</h3>
+            <div class="flex flex-col gap-3">
+              <input type="text" id="wth-bank" placeholder="Enter Bank Name (CBE, Awash, etc)" class="w-full bg-[#1e2420] text-xs text-white p-3 rounded-xl border border-[#2d3630] focus:outline-none font-bold">
+              <input type="text" id="wth-acc-num" placeholder="Enter Account Number" class="w-full bg-[#1e2420] text-xs text-white p-3 rounded-xl border border-[#2d3630] focus:outline-none font-mono">
+              <input type="number" id="wth-amt" placeholder="Amount (Minimum 100 ETB)" class="w-full bg-[#1e2420] text-xs text-white p-3 rounded-xl border border-[#2d3630] focus:outline-none font-bold">
+              <button onclick="submitWithdrawSlip()" class="w-full bg-brandGreen text-white font-black text-xs py-3 rounded-xl">Confirm Withdrawal</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- View: History Slips Logs -->
+      <div id="view-history" class="view-content hidden flex flex-col gap-4">
+        <div class="bg-brandCard p-5 rounded-3xl border border-white/5">
+          <h3 class="font-bold text-sm">Account Action Logs</h3>
+          <div id="logs-container" class="flex flex-col gap-2 mt-3 max-h-72 overflow-y-auto no-scrollbar">
+            <p class="text-xs text-gray-500 text-center py-4">No logged slips inside.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- View: Profile screen -->
+      <div id="view-profile" class="view-content hidden flex flex-col gap-4">
+        <div class="bg-brandCard p-5 rounded-3xl border border-white/5 flex flex-col gap-3">
+          <p id="prof-phone-display" class="font-bold text-sm text-gray-400">+2519xxxxxxxx</p>
+          <button onclick="logOut()" class="w-full bg-red-600/30 text-red-300 font-bold text-xs py-2.5 rounded-xl">Logout Account</button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Bottom Sticky Nav (Screen 2 Perfect layout) -->
+    <nav class="fixed bottom-0 left-0 right-0 p-4 bg-[#141a16]/95 backdrop-blur-xl border-t border-white/5 flex justify-between items-center z-30 max-w-lg mx-auto shadow-2xl">
+      <button onclick="switchMainTab('home')" id="nav-home" class="flex flex-col items-center gap-1 flex-1 text-brandGreen transition">
+        <span class="text-lg"><i class="fa-solid fa-house"></i></span>
+        <span class="text-[9px] font-bold">Home</span>
+      </button>
+      <button onclick="switchMainTab('aviator')" id="nav-aviator" class="flex flex-col items-center gap-1 flex-1 text-gray-500 transition">
+        <span class="text-lg"><i class="fa-solid fa-plane-up"></i></span>
+        <span class="text-[9px] font-bold">Crash</span>
+      </button>
+      <button onclick="switchMainTab('cashier')" id="nav-cashier" class="flex flex-col items-center gap-1 flex-1 text-gray-500 transition">
+        <span class="text-lg"><i class="fa-solid fa-wallet"></i></span>
+        <span class="text-[9px] font-bold">Cashier</span>
+      </button>
+      <button onclick="switchMainTab('history')" id="nav-history" class="flex flex-col items-center gap-1 flex-1 text-gray-500 transition">
+        <span class="text-lg"><i class="fa-solid fa-receipt"></i></span>
+        <span class="text-[9px] font-bold">Bet Slip</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ================= MASTER CONTROLLERS: THE HIDDEN ADMIN CONTROL PANEL ================= -->
+  <div id="admin-portal" class="hidden max-w-lg w-full mx-auto px-4 py-6 z-40 relative">
+    <div class="bg-brandCard border-2 border-yellow-500 rounded-3xl p-5 flex flex-col gap-4">
+      <h2 class="font-black text-base border-b border-white/5 pb-2 text-white">⚙️ Shamil's AmoleBet Admin Dashboard</h2>
+
+      <div>
+        <h4 class="font-extrabold text-xs text-gray-400 uppercase tracking-widest mb-3">Pending User Deposit Slips</h4>
+        <div id="admin-deposits-list" class="flex flex-col gap-2 max-h-56 overflow-y-auto no-scrollbar">
+          <p class="text-xs text-gray-500 py-3 text-center">No pending Telebirr slips in review queue.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FLOATING REPLICATED CHAT WIDGET (EXACT REPLICA FROM SCREENSHOT) ================= -->
+  <div class="fixed bottom-24 right-4 z-40 flex flex-col items-end gap-2.5">
+    
+    <!-- Collapsible Chat Window dialog -->
+    <div id="chat-window" class="hidden w-72 h-80 bg-[#141a16] border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+      <div class="bg-brandGreen text-white p-3 flex justify-between items-center font-bold text-xs">
+        <span>🟢 Support Operator (Shamil)</span>
+        <button onclick="toggleChatDisplay()" class="text-xs">✕</button>
+      </div>
+      <div id="chat-scroller" class="flex-1 p-3 overflow-y-auto flex flex-col gap-2 text-[11px] no-scrollbar">
+        <div class="bg-brandGreen/20 text-white p-2.5 rounded-xl rounded-tl-none w-4/5 leading-relaxed">
+          Welcome to AmoleBet! Transfer direct deposits to Telebirr: <span class="text-brandGreen font-bold">0935140409</span> (Shamil). Please send your transaction code here to complete approval.
+        </div>
+      </div>
+    </div>
+
+    <!-- Replicated White helper prompt buttons with green borders (Screenshot 1) -->
+    <div id="chat-prompts" class="flex flex-col items-end gap-1.5">
+      <div class="bg-white text-black text-[11px] font-semibold py-1.5 px-3.5 rounded-xl shadow border border-gray-100">
+        How can I help you?
+      </div>
+      <button onclick="sendQuickMessage('I have a question')" class="bg-white text-gray-800 text-[10px] font-bold py-1.5 px-3.5 rounded-full border border-brandGreen hover:bg-gray-50 transition">
+        I have a question
+      </button>
+      <button onclick="sendQuickMessage('Tell me more')" class="bg-white text-gray-800 text-[10px] font-bold py-1.5 px-3.5 rounded-full border border-brandGreen hover:bg-gray-50 transition">
+        Tell me more
+      </button>
+    </div>
+
+    <!-- Green Float Button with Red '1' Indicator -->
+    <button onclick="toggleChatDisplay()" class="w-12 h-12 rounded-full bg-brandGreen text-white flex items-center justify-center text-xl shadow-2xl relative hover:brightness-105 transition">
+      <i class="fa-regular fa-comment-dots"></i>
+      <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-600 rounded-full border-2 border-appDarkBg text-[9px] font-black flex items-center justify-center">1</span>
+    </button>
+  </div>
+
+  <!-- ================= SYSTEM CORE PROGRAM LOGIC ================= -->
+  <script>
+    // SYSTEM DATABASES MOCKED LOCALLY
+    let usersDb = JSON.parse(localStorage.getItem('ab_users_store')) || {};
+    let loggedUser = localStorage.getItem('ab_logged_phone') || "";
+    let isAuth = localStorage.getItem('ab_is_auth') === 'true';
+    let transactionsList = JSON.parse(localStorage.getItem('ab_transactions_list')) || [];
+
+    // Signup workflow cache variables
+    let tempPhone = "";
+    let tempPassword = "";
+
+    function appInit() {
+      if (isAuth && loggedUser && usersDb[loggedUser]) {
+        document.getElementById('auth-screen').classList.add('hidden');
+        document.getElementById('main-portal').classList.remove('hidden');
+        document.getElementById('prof-phone-display').innerText = loggedUser;
+        updateUI();
+      } else {
+        document.getElementById('auth-screen').classList.remove('hidden');
+        document.getElementById('main-portal').classList.add('hidden');
+      }
+      syncAdminPanel();
+    }
+
+    function updateUI() {
+      if (loggedUser && usersDb[loggedUser]) {
+        document.getElementById('user-balance-lbl').innerText = usersDb[loggedUser].balance.toFixed(2);
+      }
+      renderUserActivityLogs();
+    }
+
+    // AUTH SWITCH CONTROLLERS
+    function toggleAuthTab(tab) {
+      document.getElementById('otp-fields').classList.add('hidden');
+      if (tab === 'signin') {
+        document.getElementById('signin-fields').classList.remove('hidden');
+        document.getElementById('signup-fields').classList.add('hidden');
+        document.getElementById('tab-signin').className = "py-2 rounded-lg text-xs font-bold bg-[#252b27] text-white transition border border-white/5";
+        document.getElementById('tab-signup').className = "py-2 rounded-lg text-xs font-bold text-gray-400 transition";
+      } else {
+        document.getElementById('signup-fields').classList.remove('hidden');
+        document.getElementById('signin-fields').classList.add('hidden');
+        document.getElementById('tab-signup').className = "py-2 rounded-lg text-xs font-bold bg-[#252b27] text-white transition border border-white/5";
+        document.getElementById('tab-signin').className = "py-2 rounded-lg text-xs font-bold text-gray-400 transition";
+      }
+    }
+
+    // REGISTRATION STEP 1 (Complete Registration action)
+    function triggerVerificationStep() {
+      const phoneInput = document.getElementById('reg-phone').value.trim();
+      const pass = document.getElementById('reg-pass').value.trim();
+      const confirm = document.getElementById('reg-confirm').value.trim();
+
+      if (!phoneInput || !pass || !confirm) {
+        alert("Fill in all Phone and Password details.");
+        return;
+      }
+      if (pass !== confirm) {
+        alert("Passwords do not match.");
+        return;
+      }
+
+      tempPhone = "+251" + phoneInput.replace(/^0+/, '');
+      tempPassword = pass;
+
+      document.getElementById('signup-fields').classList.add('hidden');
+      document.getElementById('otp-fields').classList.remove('hidden');
+    }
+
+    // REGISTRATION STEP 2 (Verify and Activate action)
+    function verifyUserOTP() {
+      const code = document.getElementById('otp-input').value.trim();
+      if (code !== "1234") {
+        alert("Incorrect verification code. Type code '1234' to activate your account.");
+        return;
+      }
+
+      if (usersDb[tempPhone]) {
+        alert("This account is already registered. Logging you in directly.");
+        loginUserDirectly(tempPhone);
+        return;
+      }
+
+      // Create new player record with free ETB balance matching screenshot
+      usersDb[tempPhone] = {
+        password: tempPassword,
+        balance: 0.44
+      };
+      localStorage.setItem('ab_users_store', JSON.stringify(usersDb));
+
+      loginUserDirectly(tempPhone);
+    }
+
+    function loginUser() {
+      const phone = "+251" + document.getElementById('login-phone').value.trim().replace(/^0+/, '');
+      const pass = document.getElementById('login-pass').value.trim();
+
+      if (!usersDb[phone] || usersDb[phone].password !== pass) {
+        alert("Incorrect Phone or Password.");
+        return;
+      }
+
+      loginUserDirectly(phone);
+    }
+
+    function loginUserDirectly(phone) {
+      loggedUser = phone;
+      isAuth = true;
+      localStorage.setItem('ab_logged_phone', loggedUser);
+      localStorage.setItem('ab_is_auth', 'true');
+      
+      document.getElementById('otp-fields').classList.add('hidden');
+      appInit();
+    }
+
+    function logOut() {
+      isAuth = false;
+      localStorage.removeItem('ab_is_auth');
+      appInit();
+    }
+
+    // INTERFACE NAVIGATION TABS
+    function switchMainTab(viewId) {
+      document.querySelectorAll('.view-content').forEach(v => v.classList.add('hidden'));
+      document.querySelectorAll('nav button').forEach(b => {
+        b.classList.remove('text-brandGreen');
+        b.classList.add('text-gray-500');
+      });
+
+      document.getElementById(`view-${viewId}`).classList.remove('hidden');
+      const activeNav = document.getElementById(`nav-${viewId}`);
+      if (activeNav) {
+        activeNav.classList.remove('text-gray-500');
+        activeNav.classList.add('text-brandGreen');
+      }
+    }
+
+    function toggleCashierMenu(mode) {
+      document.getElementById('cashier-deposit-panel').classList.add('hidden');
+      document.getElementById('cashier-withdraw-panel').classList.add('hidden');
+      document.getElementById('cashier-btn-dep').className = "py-2.5 rounded-lg text-xs font-black text-gray-400 transition";
+      document.getElementById('cashier-btn-wth').className = "py-2.5 rounded-lg text-xs font-black text-gray-400 transition";
+
+      document.getElementById(`cashier-${mode}-panel`).classList.remove('hidden');
+      document.getElementById(`cashier-btn-${mode === 'deposit' ? 'dep' : 'wth'}`).className = "py-2.5 rounded-lg text-xs font-black bg-brandGreen text-white transition";
+    }
+
+    function openCashier(mode) {
+      switchMainTab('cashier');
+      toggleCashierMenu(mode);
+    }
+
+    // ================== CASHIER & MANUAL TELEBIRR SLIPS HANDLING ==================
+    function submitTelebirrDepositSlip() {
+      const amount = parseFloat(document.getElementById('deposit-amount-field').value);
+      const refCode = document.getElementById('deposit-ref-field').value.trim().toUpperCase();
+
+      if (isNaN(amount) || amount < 50) {
+        alert("Minimum deposit limit is 50 ETB.");
+        return;
+      }
+      if (!refCode) {
+        alert("Please provide the Telebirr Transaction reference ID.");
+        return;
+      }
+
+      // Save a new pending deposit structure
+      const logRecord = {
+        id: "TXN_" + Date.now(),
+        userPhone: loggedUser,
+        type: 'deposit',
+        amount: amount,
+        reference: refCode,
+        status: 'pending',
+        timestamp: new Date().toLocaleTimeString()
+      };
+
+      transactionsList.unshift(logRecord);
+      localStorage.setItem('ab_transactions_list', JSON.stringify(transactionsList));
+
+      alert(`Your transaction for ${amount} ETB has been logged! Toggle the 'Admin Dashboard' at the very top of the screen to view and manually approve your deposit!`);
+      
+      document.getElementById('deposit-amount-field').value = "";
+      document.getElementById('deposit-ref-field').value = "";
+
+      updateUI();
+      syncAdminPanel();
+    }
+
+    function submitWithdrawSlip() {
+      const bank = document.getElementById('wth-bank').value.trim();
+      const account = document.getElementById('wth-acc-num').value.trim();
+      const amt = parseFloat(document.getElementById('wth-amt').value);
+
+      if (!bank || !account || isNaN(amt) || amt < 100) {
+        alert("Minimum bank cashout is 100 ETB.");
+        return;
+      }
+
+      if (amt > usersDb[loggedUser].balance) {
+        alert("Insufficient balance to execute cashout!");
+        return;
+      }
+
+      // Deduct immediately and log transaction
+      usersDb[loggedUser].balance -= amt;
+      localStorage.setItem('ab_users_store', JSON.stringify(usersDb));
+
+      const logRecord = {
+        id: "WTH_" + Date.now(),
+        userPhone: loggedUser,
+        type: 'withdraw',
+        amount: amt,
+        bank: bank,
+        account: account,
+        status: 'pending',
+        timestamp: new Date().toLocaleTimeString()
+      };
+
+      transactionsList.unshift(logRecord);
+      localStorage.setItem('ab_transactions_list', JSON.stringify(transactionsList));
+
+      alert(`Withdrawal request logged successfully!`);
+      document.getElementById('wth-bank').value = "";
+      document.getElementById('wth-acc-num').value = "";
+      document.getElementById('wth-amt').value = "";
+
+      updateUI();
+      syncAdminPanel();
+    }
+
+    // ================== ADMIN MODULE CONTROLLER (TOP SWITCH BOARD ACTION) ==================
+    function changeRole(role) {
+      systemRole = role;
+      document.getElementById('role-player-btn').className = "bg-black/20 text-black px-2 py-0.5 rounded font-bold uppercase";
+      document.getElementById('role-admin-btn').className = "bg-black/20 text-black px-2 py-0.5 rounded font-bold uppercase";
+
+      if (role === 'player') {
+        document.getElementById('role-player-btn').className = "bg-black text-white px-2 py-0.5 rounded font-bold uppercase";
+        document.getElementById('main-portal').classList.remove('hidden');
+        document.getElementById('admin-portal').classList.add('hidden');
+      } else {
+        document.getElementById('role-admin-btn').className = "bg-black text-white px-2 py-0.5 rounded font-bold uppercase";
+        document.getElementById('main-portal').classList.add('hidden');
+        document.getElementById('admin-portal').classList.remove('hidden');
+        syncAdminPanel();
+      }
+    }
+
+    function syncAdminPanel() {
+      const pendings = transactionsList.filter(t => t.type === 'deposit' && t.status === 'pending');
+      document.getElementById('pending-count-badge').innerText = pendings.length;
+
+      const container = document.getElementById('admin-deposits-list');
+      if (pendings.length === 0) {
+        container.innerHTML = `<p class="text-xs text-gray-500 py-3 text-center">No pending Telebirr slips in review queue.</p>`;
+      } else {
+        container.innerHTML = pendings.map(txn => `
+          <div class="bg-[#1e2420] border border-white/5 p-4 rounded-xl flex flex-col gap-2 text-xs">
+            <div class="flex justify-between font-bold text-gray-400">
+              <span>👤 User: ${txn.userPhone}</span>
+              <span class="text-brandGold">Ref: ${txn.reference}</span>
+            </div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm font-black text-white">Amount: ${txn.amount.toFixed(2)} ETB</span>
+              <div class="flex gap-1.5">
+                <button onclick="approveTransaction('${txn.id}')" class="bg-brandGreen text-white px-3 py-1 rounded-lg font-bold">Approve</button>
+                <button onclick="rejectTransaction('${txn.id}')" class="bg-red-600/30 text-red-400 px-3 py-1 rounded-lg font-bold">Decline</button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function approveTransaction(id) {
+      const idx = transactionsList.findIndex(t => t.id === id);
+      if (idx !== -1) {
+        transactionsList[idx].status = 'approved';
+        const targetPhone = transactionsList[idx].userPhone;
+        if (usersDb[targetPhone]) {
+          usersDb[targetPhone].balance += transactionsList[idx].amount;
+        }
+        localStorage.setItem('ab_transactions_list', JSON.stringify(transactionsList));
+        localStorage.setItem('ab_users_store', JSON.stringify(usersDb));
+        alert("Transaction approved! Balance credited.");
+        updateUI();
+        syncAdminPanel();
+      }
+    }
+
+    function rejectTransaction(id) {
+      const idx = transactionsList.findIndex(t => t.id === id);
+      if (idx !== -1) {
+        transactionsList[idx].status = 'declined';
+        localStorage.setItem('ab_transactions_list', JSON.stringify(transactionsList));
+        alert("Transaction declined!");
+        syncAdminPanel();
+      }
+    }
+
+    // ================== GAME ENGINE: AVIATOR ==================
+    let isFlying = false;
+    let avMulti = 1.00;
+    let avLoop;
+    let lockedStake = 0;
+
+    function runAviator() {
+      const stake = parseFloat(document.getElementById('av-bet').value);
+      const btn = document.getElementById('av-btn');
+
+      if (!isFlying) {
+        if (isNaN(stake) || stake < 10 || stake > usersDb[loggedUser].balance) {
+          alert("Minimum bet is 10 ETB, check your balance.");
+          return;
+        }
+
+        usersDb[loggedUser].balance -= stake;
+        lockedStake = stake;
+        updateUI();
+
+        isFlying = true;
+        avMulti = 1.00;
+        document.getElementById('av-multiplier').innerText = "1.00x";
+        document.getElementById('av-multiplier').className = "text-5xl font-black text-green-400 font-mono";
+
+        btn.innerText = "Cash Out";
+        btn.className = "bg-red-600 text-white font-black rounded-xl text-xs transition";
+
+        const crashPoint = (Math.random() * 4 + 1.05).toFixed(2);
+
+        avLoop = setInterval(() => {
+          avMulti += 0.05;
+          document.getElementById('av-multiplier').innerText = avMulti.toFixed(2) + "x";
+
+          if (avMulti >= crashPoint) {
+            clearInterval(avLoop);
+            executeCrash();
+          }
+        }, 100);
+
+      } else {
+        clearInterval(avLoop);
+        const winReward = lockedStake * avMulti;
+        usersDb[loggedUser].balance += winReward;
+        localStorage.setItem('ab_users_store', JSON.stringify(usersDb));
+
+        logAction("🏆", `Aviator payout (${avMulti.toFixed(2)}x)`, `+${winReward.toFixed(2)} ETB`);
+        alert(`Cashout Successful! Payout: ${winReward.toFixed(2)} ETB!`);
+        resetAviator();
+      }
+    }
+
+    function executeCrash() {
+      isFlying = false;
+      document.getElementById('av-multiplier').className = "text-5xl font-black text-red-600 font-mono";
+      document.getElementById('av-multiplier').innerText = "Busted";
+      logAction("💥", "Lost Aviator Bet", `-${lockedStake.toFixed(2)} ETB`);
+      setTimeout(resetAviator, 2500);
+    }
+
+    function resetAviator() {
+      clearInterval(avLoop);
+      isFlying = false;
+      const btn = document.getElementById('av-btn');
+      btn.innerText = "Place Bet";
+      btn.className = "bg-brandGreen text-white font-black rounded-xl text-xs transition";
+    }
+
+    function sportsBetStake(team, odd) {
+      const input = prompt(`Enter stake amount to place a wager on: ${team} (${odd}x):`, "50");
+      const stake = parseFloat(input);
+
+      if (isNaN(stake) || stake < 10 || stake > usersDb[loggedUser].balance) {
+        alert("Bet rejected. Minimum match stake is 10 ETB.");
+        return;
+      }
+
+      usersDb[loggedUser].balance -= stake;
+      localStorage.setItem('ab_users_store', JSON.stringify(usersDb));
+
+      logAction("⚽", `Match bet placed on ${team}`, `-${stake.toFixed(2)} ETB`);
+      alert("Bet placed successfully!");
+      updateUI();
+    }
+
+    // ================== USER ACTIVITY LOGS LOGGER ==================
+    function logAction(emoji, label, amtStr) {
+      const record = {
+        id: "ACT_" + Date.now(),
+        userPhone: loggedUser,
+        type: 'game_play',
+        label: label,
+        emoji: emoji,
+        amount: amtStr,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      transactionsList.unshift(record);
+      localStorage.setItem('ab_transactions_list', JSON.stringify(transactionsList));
+      updateUI();
+    }
+
+    function renderUserActivityLogs() {
+      const container = document.getElementById('logs-container');
+      const userLogs = transactionsList.filter(t => t.userPhone === loggedUser);
+
+      if (userLogs.length === 0) {
+        container.innerHTML = `<p class="text-xs text-gray-500 text-center py-4">No logged slips inside.</p>`;
+        return;
+      }
+
+      container.innerHTML = userLogs.map(log => {
+        let amtStyle = "text-yellow-500";
+        let resolvedAmount = log.amount;
+
+        if (log.type === 'deposit') {
+          resolvedAmount = `+${log.amount.toFixed(2)} ETB`;
+          amtStyle = log.status === 'approved' ? "text-brandGreen font-bold" : log.status === 'declined' ? "text-red-500 font-bold" : "text-yellow-500 font-bold";
+        } else if (log.type === 'withdraw') {
+          resolvedAmount = `-${log.amount.toFixed(2)} ETB`;
+          amtStyle = log.status === 'approved' ? "text-brandGreen font-bold" : log.status === 'declined' ? "text-red-500 font-bold" : "text-yellow-500 font-bold";
+        }
+
+        const labelName = log.type === 'deposit' ? `Telebirr Deposit (${log.status})` : log.type === 'withdraw' ? `Bank Withdrawal (${log.status})` : log.label;
+        const iconEmoji = log.type === 'deposit' ? "📥" : log.type === 'withdraw' ? "🏦" : log.emoji;
+
+        return `
+          <div class="bg-black/40 border border-white/5 p-3.5 rounded-xl flex justify-between items-center text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="text-lg">${iconEmoji}</span>
+              <div>
+                <p class="font-extrabold text-white">${labelName}</p>
+                <p class="text-[8px] text-gray-500">${log.timestamp || 'Just Now'}</p>
+              </div>
+            </div>
+            <span class="font-black font-mono ${amtStyle}">${resolvedAmount}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // CHAT ENGINE
+    function toggleChatDisplay() {
+      document.getElementById('chat-window').classList.toggle('hidden');
+    }
+
+    function sendQuickMessage(type) {
+      const area = document.getElementById('chat-scroller');
+      area.insertAdjacentHTML('beforeend', `
+        <div class="bg-brandCard border border-white/5 text-white p-2 rounded-xl rounded-tr-none w-4/5 self-end ml-auto text-right font-medium">
+          ${type}
+        </div>
+      `);
+
+      document.getElementById('chat-prompts').classList.add('hidden');
+      document.getElementById('chat-window').classList.remove('hidden');
+
+      setTimeout(() => {
+        let answer = "";
+        if (type === 'I have a question') {
+          answer = "How can we help? If you have logged a deposit slip, Shamil will review and approve it. Toggle the yellow Admin Dashboard at the very top of the screen to manually check and approve it yourself!";
+        } else {
+          answer = "AmoleBet matches 100% of your initial deposits! Transfer any amount over 50 ETB to 0935140409 (Shamil) on Telebirr and submit your ticket code inside.";
+        }
         
-        bot.send_message(ADMIN_CHAT_ID, "Execute approval choice:", reply_markup=markup)
-        bot.send_message(chat_id, "⏳ Your proof has been submitted to Shamil for rapid review. Thank you for waiting!")
-    else:
-        bot.send_message(chat_id, "⚠️ Invalid action. Open the console keyboard to continue.")
+        area.insertAdjacentHTML('beforeend', `
+          <div class="bg-brandGreen/20 text-white p-2.5 rounded-xl rounded-tl-none w-4/5 leading-relaxed mt-2">
+            ${answer}
+          </div>
+        `);
+        area.scrollTop = area.scrollHeight;
+      }, 1000);
+    }
 
-# ==================== ADMIN DECISION SYSTEM ====================
-@bot.callback_query_handler(func=lambda call: True)
-def handle_approval_buttons(call):
-    bot.answer_callback_query(call.id)
-    parts = call.data.split("_")
-    action = parts[0]
-    target_user = int(parts[1])
-    
-    t_state = get_user_state(target_user)
-    
-    if action == "approve":
-        amount = float(parts[2])
-        t_state["balance"] += amount
-        bot.edit_message_text(f"✅ Approved +{amount} ETB for User {target_user}", chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(target_user, f"🎉 Good news! Shamil approved your deposit of **{amount:.2f} ETB**.")
-    elif action == "decline":
-        bot.edit_message_text(f"❌ Declined deposit for User {target_user}", chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(target_user, "❌ Your deposit proof was declined by Shamil. Please send a valid receipt.")
-
-# Run Bot Engine
-if __name__ == '__main__':
-    bot.polling(none_stop=True)
+    window.onload = () => {
+      appInit();
+    };
+  </script>
+</body>
+</html>
