@@ -1,0 +1,17 @@
+{
+  "name": "amole-bet",
+  "version": "1.0.0",
+  "description": "AmoleBet - Ethiopia's Premium Betting Hub",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "echo 'No build step needed for static HTML'",
+    "test": "echo 'No tests configured'"
+  },
+  "keywords": ["betting", "ethiopia", "sports"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vercel/speed-insights": "^1.0.12"
+  }
+}
